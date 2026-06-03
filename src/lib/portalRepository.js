@@ -29,6 +29,23 @@ export async function signOutCustomer() {
   if (error) throw error;
 }
 
+export async function createPasswordResetRequest({ email, phone }) {
+  if (!isSupabaseConfigured) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { error } = await supabase
+    .from("password_reset_requests")
+    .insert({
+      email,
+      phone,
+      status: "otp_required"
+    });
+
+  if (error) throw error;
+  return true;
+}
+
 function formatDate(value) {
   if (!value) return "";
   return new Date(value).toLocaleDateString("en-GB", {

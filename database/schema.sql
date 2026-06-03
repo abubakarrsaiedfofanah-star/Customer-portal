@@ -62,6 +62,17 @@ create table if not exists public.payment_requests (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.password_reset_requests (
+  id uuid primary key default gen_random_uuid(),
+  email text not null,
+  phone text not null,
+  otp_code text,
+  status text not null default 'otp_required',
+  admin_note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create or replace view public.customer_portal_summary as
 select
   c.id as customer_id,
@@ -92,6 +103,7 @@ alter table public.customer_bikes enable row level security;
 alter table public.payments enable row level security;
 alter table public.notifications enable row level security;
 alter table public.payment_requests enable row level security;
+alter table public.password_reset_requests enable row level security;
 
 create policy "customers can read own profile"
   on public.customers for select
@@ -124,3 +136,7 @@ create policy "customers can create payment requests"
 create policy "customers can read own payment requests"
   on public.payment_requests for select
   using (auth.uid() = customer_id);
+
+create policy "anyone can request password reset otp"
+  on public.password_reset_requests for insert
+  with check (true);

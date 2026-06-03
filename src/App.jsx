@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   createPaymentNotification,
   createPaymentRequest,
+  createPasswordResetRequest,
   emptyPortalData,
   getCurrentUser,
   isSupabaseConfigured,
@@ -136,13 +137,19 @@ function SystemState({ title, text }) {
 function LoginPage({ onLogin, errorMessage }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetPhone, setResetPhone] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [mode, setMode] = useState("login");
   const [localError, setLocalError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isResetMode = mode === "reset";
 
   async function handleSubmit(event) {
     event.preventDefault();
     setLocalError("");
+    setSuccessMessage("");
 
     if (!email.trim() || !password) {
       setLocalError("Enter your email and password.");
@@ -154,57 +161,143 @@ function LoginPage({ onLogin, errorMessage }) {
     setIsSubmitting(false);
   }
 
+  async function handleResetSubmit(event) {
+    event.preventDefault();
+    setLocalError("");
+    setSuccessMessage("");
+
+    if (!resetEmail.trim() || !resetPhone.trim()) {
+      setLocalError("Enter your email address and phone number.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await createPasswordResetRequest({
+        email: resetEmail.trim(),
+        phone: resetPhone.trim()
+      });
+      setSuccessMessage("Request sent. Admin will send your OTP before your new password is created.");
+      setResetEmail("");
+      setResetPhone("");
+    } catch (error) {
+      setLocalError(error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function switchMode(nextMode) {
+    setMode(nextMode);
+    setLocalError("");
+    setSuccessMessage("");
+  }
+
   return (
-    <main className="auth-page">
+    <main className="auth-page auth-page-blue">
       <section className="auth-panel" aria-labelledby="loginTitle">
         <div className="brand-block">
           <p className="brand-kicker">Bumu PayGo</p>
-          <h1 id="loginTitle">Customer Portal</h1>
-          <p>Log in with your approved customer account to view payments, bike details, and alerts.</p>
+          <h1 id="loginTitle">{isResetMode ? "Forgot Password" : "Customer Portal"}</h1>
+          <p>
+            {isResetMode
+              ? "Request an OTP from admin before receiving a new password."
+              : "Log in with your approved customer account to view payments, bike details, and alerts."}
+          </p>
         </div>
 
-        <form className="login-form" noValidate onSubmit={handleSubmit}>
-          <div className="field-group">
-            <label htmlFor="email">Email address</label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              placeholder="name@example.com"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-            />
-          </div>
-
-          <div className="field-group">
-            <label htmlFor="password">Password</label>
-            <div className="password-row">
+        {isResetMode ? (
+          <form className="login-form" noValidate onSubmit={handleResetSubmit}>
+            <div className="field-group">
+              <label htmlFor="resetEmail">Email address</label>
               <input
-                id="password"
-                name="password"
-                type={showPassword ? "text" : "password"}
-                autoComplete="current-password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                id="resetEmail"
+                name="resetEmail"
+                type="email"
+                autoComplete="email"
+                placeholder="name@example.com"
+                value={resetEmail}
+                onChange={(event) => setResetEmail(event.target.value)}
                 required
               />
-              <button className="small-button" type="button" onClick={() => setShowPassword((value) => !value)}>
-                {showPassword ? "Hide" : "Show"}
-              </button>
             </div>
-          </div>
 
-          <p className="form-message error-message" role="status" aria-live="polite">
-            {localError || errorMessage}
-          </p>
+            <div className="field-group">
+              <label htmlFor="resetPhone">Phone number</label>
+              <input
+                id="resetPhone"
+                name="resetPhone"
+                type="tel"
+                autoComplete="tel"
+                placeholder="+254..."
+                value={resetPhone}
+                onChange={(event) => setResetPhone(event.target.value)}
+                required
+              />
+            </div>
 
-          <button className="primary-button" type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Logging In..." : "Log In"}
-          </button>
-        </form>
+            <p className="otp-note">Admin must send the OTP before the customer receives a new password.</p>
+
+            <p className={`form-message ${successMessage ? "success-message" : "error-message"}`} role="status" aria-live="polite">
+              {successMessage || localError}
+            </p>
+
+            <button className="primary-button" type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Sending Request..." : "Request OTP"}
+            </button>
+
+            <button className="link-button" type="button" onClick={() => switchMode("login")}>
+              Back to login
+            </button>
+          </form>
+        ) : (
+          <form className="login-form" noValidate onSubmit={handleSubmit}>
+            <div className="field-group">
+              <label htmlFor="email">Email address</label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                placeholder="name@example.com"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                required
+              />
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="password">Password</label>
+              <div className="password-row">
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
+                />
+                <button className="small-button" type="button" onClick={() => setShowPassword((value) => !value)}>
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </div>
+            </div>
+
+            <button className="link-button forgot-button" type="button" onClick={() => switchMode("reset")}>
+              Forgot password?
+            </button>
+
+            <p className="form-message error-message" role="status" aria-live="polite">
+              {localError || errorMessage}
+            </p>
+
+            <button className="primary-button" type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Logging In..." : "Log In"}
+            </button>
+          </form>
+        )}
       </section>
     </main>
   );
